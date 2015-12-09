@@ -3,18 +3,12 @@ package com.coolweather.app.activity;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.coolweather.app.R;
-import com.coolweather.app.db.CoolWeatherDB;
-import com.coolweather.app.model.City;
-import com.coolweather.app.model.County;
-import com.coolweather.app.model.Province;
-import com.coolweather.app.util.HttpCallbackListener;
-import com.coolweather.app.util.HttpUtil;
-import com.coolweather.app.util.Utility;
-
 import android.app.Activity;
 import android.app.ProgressDialog;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.Window;
@@ -25,59 +19,75 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.coolweather.app.R;
+import com.coolweather.app.db.CoolWeatherDB;
+import com.coolweather.app.model.City;
+import com.coolweather.app.model.County;
+import com.coolweather.app.model.Province;
+import com.coolweather.app.util.HttpCallbackListener;
+import com.coolweather.app.util.HttpUtil;
+import com.coolweather.app.util.Utility;
+
 public class ChooseAreaActivity extends Activity {
-	
+
 	public static final int LEVEL_PROVINCE = 0;
-	
 	public static final int LEVEL_CITY = 1;
-	
 	public static final int LEVEL_COUNTY = 2;
 	
 	private ProgressDialog progressDialog;
-	
 	private TextView titleText;
-	
 	private ListView listView;
-	
 	private ArrayAdapter<String> adapter;
-	
 	private CoolWeatherDB coolWeatherDB;
-	
 	private List<String> dataList = new ArrayList<String>();
-	
-	/**省列表*/
+	/**
+	 * 省列表
+	 */
 	private List<Province> provinceList;
-	
-	/**市列表*/
+	/**
+	 * 市列表
+	 */
 	private List<City> cityList;
-	
-	/**县列表*/
+	/**
+	 * 县列表
+	 */
 	private List<County> countyList;
-	
-	/**选中的省份*/
+	/**
+	 * 选中的省份
+	 */
 	private Province selectedProvince;
-	
-	/**选中的城市*/
+	/**
+	 * 选中的城市
+	 */
 	private City selectedCity;
-	
-	/**当前选中的级别*/
+	/**
+	 * 当前选中的级别
+	 */
 	private int currentLevel;
-	
+	/**
+	 * 是否从WeatherActivity中跳转过来。
+	 */
+	private boolean isFromWeatherActivity;
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		isFromWeatherActivity = getIntent().getBooleanExtra("from_weather_activity", false);
+		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+		if (prefs.getBoolean("city_selected", false) && !isFromWeatherActivity) {
+			Intent intent = new Intent(this, WeatherActivity.class);
+			startActivity(intent);
+			finish();
+			return;
+		}
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
 		setContentView(R.layout.choose_area);
-		
-		listView = (ListView)findViewById(R.id.list_view);
-		titleText = (TextView)findViewById(R.id.title_text);
-		adapter = new ArrayAdapter<String>(this, 
-				android.R.layout.simple_list_item_1, dataList);
+		listView = (ListView) findViewById(R.id.list_view);
+		titleText = (TextView) findViewById(R.id.title_text);
+		adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, dataList);
 		listView.setAdapter(adapter);
-		
 		coolWeatherDB = CoolWeatherDB.getInstance(this);
 		listView.setOnItemClickListener(new OnItemClickListener() {
-
 			@Override
 			public void onItemClick(AdapterView<?> arg0, View view, int index,
 					long arg3) {
@@ -87,12 +97,18 @@ public class ChooseAreaActivity extends Activity {
 				} else if (currentLevel == LEVEL_CITY) {
 					selectedCity = cityList.get(index);
 					queryCounties();
+				} else if (currentLevel == LEVEL_COUNTY) {
+					String countyCode = countyList.get(index).getCountyCode();
+					Intent intent = new Intent(ChooseAreaActivity.this, WeatherActivity.class);
+					intent.putExtra("county_code", countyCode);
+					startActivity(intent);
+					finish();
 				}
 			}
 		});
-		queryProvinces();
+		queryProvinces();  // 加载省级数据
 	}
-	
+
 	/**
 	 * 查询全国所有的省，优先从数据库查询，如果没有查询到再去服务器上查询。
 	 */
@@ -228,8 +244,9 @@ public class ChooseAreaActivity extends Activity {
 			progressDialog.dismiss();
 		}
 	}
+	
 	/**
-	 * 捕获Back按键,根据当前的级别来判断,此时应该返回市列表、省列表还是直接退出
+	 * 捕获Back按键，根据当前的级别来判断，此时应该返回市列表、省列表、还是直接退出。
 	 */
 	@Override
 	public void onBackPressed() {
@@ -238,7 +255,12 @@ public class ChooseAreaActivity extends Activity {
 		} else if (currentLevel == LEVEL_CITY) {
 			queryProvinces();
 		} else {
+			if (isFromWeatherActivity) {
+				Intent intent = new Intent(this, WeatherActivity.class);
+				startActivity(intent);
+			}
 			finish();
 		}
 	}
+
 }
